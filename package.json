@@ -1,0 +1,33 @@
+{
+  "name": "claude-rate-monitor",
+  "version": "1.0.0",
+  "description": "See your real-time Claude API rate limit usage — the same data Claude CLI sees internally",
+  "main": "index.js",
+  "bin": {
+    "claude-rate-monitor": "./index.js"
+  },
+  "keywords": [
+    "claude",
+    "anthropic",
+    "rate-limit",
+    "usage",
+    "cli",
+    "monitor",
+    "claude-cli",
+    "api"
+  ],
+  "author": "Sanden Solutions <nate@sandensolutions.com> (https://sandensolutions.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sandensolutions/claude-rate-monitor.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ]
+}
