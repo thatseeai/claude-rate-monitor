@@ -152,7 +152,7 @@ function progressBar(ratio, width = 20) {
   return `${bar}  ${pct}%`;
 }
 
-function formatReset(resetValue) {
+function formatReset(resetValue, { showDay = false } = {}) {
   if (!resetValue) return 'unknown';
   try {
     // Reset values are Unix epoch seconds
@@ -175,10 +175,14 @@ function formatReset(resetValue) {
       timeZoneName: 'short',
     });
 
+    const dayPrefix = showDay
+      ? `(${d.toLocaleDateString('en-US', { weekday: 'short' })}) `
+      : '';
+
     if (diffHr > 0) {
-      return `${timeStr} (${diffHr}h ${remainMin}m)`;
+      return `${dayPrefix}${timeStr} (${diffHr}h ${remainMin}m)`;
     }
-    return `${timeStr} (${diffMin}m)`;
+    return `${dayPrefix}${timeStr} (${diffMin}m)`;
   } catch {
     return isoString;
   }
@@ -219,7 +223,7 @@ Resets: ${dim}${formatReset(data.session.reset)}${reset}
 
 ${bold}Weekly (7d window)${reset}
 ${progressBar(data.weekly.utilization)}
-Resets: ${dim}${formatReset(data.weekly.reset)}${reset}
+Resets: ${dim}${formatReset(data.weekly.reset, { showDay: true })}${reset}
 
 Status: ${statusColor}${data.overallStatus}${reset}${data.overageStatus ? `  |  Overage: ${data.overageStatus}` : ''}
 `);
