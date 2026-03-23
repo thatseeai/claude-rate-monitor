@@ -19,6 +19,7 @@ Weekly (7d window)
 Resets Jan 31 at 8:00 AM EST
 
 Status: active
+Auth token source:  macOS Keychain
 ```
 
 ## The Discovery
@@ -56,7 +57,12 @@ When you include `anthropic-beta: oauth-2025-04-20` in your API request (with a 
 npx claude-rate-monitor
 ```
 
-On first run, it will find your Claude CLI OAuth token automatically (from `~/.claude/.credentials.json`).
+On first run, it will find your Claude CLI OAuth token automatically.
+
+**Token resolution order:**
+1. `CLAUDE_CODE_AUTH_TOKEN` environment variable (if set)
+2. macOS Keychain (`Claude Code-credentials`) — automatically used on macOS
+3. `~/.claude/.credentials.json` file (fallback)
 
 ### Option 2: curl
 
@@ -95,7 +101,7 @@ claude-rate-monitor --raw        # Show raw header values
 
 ## How It Works
 
-1. Reads your Claude CLI OAuth token from `~/.claude/.credentials.json`
+1. Reads your OAuth token (env var → macOS Keychain → credentials file)
 2. Makes a **minimal API call** (1 max token, trivial prompt) — costs ~$0.001
 3. Reads the rate limit headers from the response
 4. Displays your utilization in a human-readable format
@@ -106,7 +112,7 @@ The API call is necessary because the rate limit data only comes back as HTTP re
 
 - **Claude CLI** must be installed and authenticated (`claude` command)
 - **Node.js** 18+
-- Your OAuth token must be valid (re-run `claude` if expired)
+- A valid OAuth token — via `CLAUDE_CODE_AUTH_TOKEN` env var, macOS Keychain, or `~/.claude/.credentials.json` (re-run `claude` if expired)
 
 ## Integrating Into Your Own App
 

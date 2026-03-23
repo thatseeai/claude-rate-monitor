@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { execSync } = require('child_process');
 const https = require('https');
 
 // ─── Config ──────────────────────────────────────────────────────────
@@ -32,43 +34,64 @@ Usage:
   claude-rate-monitor --help       Show this help
 
 Requires Claude CLI to be installed and authenticated.
-Token is read from CLAUDE_CODE_AUTH_TOKEN env var (if set),
-or from ~/.claude/.credentials.json as fallback.
+Token resolution order:
+  1. CLAUDE_CODE_AUTH_TOKEN env var
+  2. macOS Keychain (Claude Code-credentials)
+  3. ~/.claude/.credentials.json
 `);
   process.exit(0);
 }
 
 // ─── Token ───────────────────────────────────────────────────────────
-function getToken() {
-  if (process.env.CLAUDE_CODE_AUTH_TOKEN) {
-    return process.env.CLAUDE_CODE_AUTH_TOKEN;
-  }
+function fromEnv() {
+  const token = process.env.CLAUDE_CODE_AUTH_TOKEN;
+  if (!token) return undefined;
+  return { token, source: 'env' };
+}
 
-  if (!fs.existsSync(CREDENTIALS_PATH)) {
-    console.error('Error: Claude CLI credentials not found.');
-    console.error('');
-    console.error('Either set the CLAUDE_CODE_AUTH_TOKEN environment variable,');
-    console.error('or ensure credentials exist at ' + CREDENTIALS_PATH);
-    console.error('');
-    console.error('Make sure Claude CLI is installed and you have logged in:');
-    console.error('  npm install -g @anthropic-ai/claude-code');
-    console.error('  claude');
-    process.exit(1);
-  }
-
+function fromKeychain() {
+  if (os.platform() !== 'darwin') return undefined;
   try {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf-8'));
+    const raw = execSync(
+      'security find-generic-password -s "Claude Code-credentials" -w',
+      { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] },
+    ).trim();
+    const creds = JSON.parse(raw);
     const token = creds?.claudeAiOauth?.accessToken;
-    if (!token) {
-      console.error('Error: No OAuth access token found in credentials file.');
-      console.error('Try re-authenticating: claude');
-      process.exit(1);
-    }
-    return token;
-  } catch (e) {
-    console.error('Error reading credentials:', e.message);
-    process.exit(1);
+    if (!token) return undefined;
+    return { token, source: 'keychain' };
+  } catch {
+    return undefined;
   }
+}
+
+function fromCredentialsFile() {
+  try {
+    const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
+    const creds = JSON.parse(raw);
+    const token = creds?.claudeAiOauth?.accessToken;
+    if (!token) return undefined;
+    return { token, source: 'file' };
+  } catch {
+    return undefined;
+  }
+}
+
+function getToken() {
+  const result = fromEnv() ?? fromKeychain() ?? fromCredentialsFile();
+  if (result) return result;
+
+  console.error('Error: Claude CLI credentials not found.');
+  console.error('');
+  console.error('Tried the following sources:');
+  console.error('  1. CLAUDE_CODE_AUTH_TOKEN environment variable');
+  console.error('  2. macOS Keychain (Claude Code-credentials)');
+  console.error('  3. ' + CREDENTIALS_PATH);
+  console.error('');
+  console.error('Make sure Claude CLI is installed and you have logged in:');
+  console.error('  npm install -g @anthropic-ai/claude-code');
+  console.error('  claude');
+  process.exit(1);
 }
 
 // ─── API Call ────────────────────────────────────────────────────────
@@ -188,7 +211,13 @@ function formatReset(resetValue, { showDay = false } = {}) {
   }
 }
 
-function display(data) {
+const SOURCE_LABELS = {
+  env: 'CLAUDE_CODE_AUTH_TOKEN env var',
+  keychain: 'macOS Keychain',
+  file: '~/.claude/.credentials.json',
+};
+
+function display(data, source) {
   if (jsonMode) {
     console.log(JSON.stringify(data, null, 2));
     return;
@@ -226,6 +255,7 @@ ${progressBar(data.weekly.utilization)}
 Resets: ${dim}${formatReset(data.weekly.reset, { showDay: true })}${reset}
 
 Status: ${statusColor}${data.overallStatus}${reset}${data.overageStatus ? `  |  Overage: ${data.overageStatus}` : ''}
+Auth token source:  ${dim}${SOURCE_LABELS[source] || source}${reset}
 `);
 
   if (watchMode) {
@@ -235,11 +265,11 @@ Status: ${statusColor}${data.overallStatus}${reset}${data.overageStatus ? `  |  
 
 // ─── Main ────────────────────────────────────────────────────────────
 async function run() {
-  const token = getToken();
+  const { token, source } = getToken();
 
   try {
     const data = await fetchUsage(token);
-    display(data);
+    display(data, source);
   } catch (e) {
     console.error('Error:', e.message);
     process.exit(1);
@@ -249,7 +279,7 @@ async function run() {
     setInterval(async () => {
       try {
         const data = await fetchUsage(token);
-        display(data);
+        display(data, source);
       } catch (e) {
         console.error('Error refreshing:', e.message);
       }
