@@ -32,15 +32,23 @@ Usage:
   claude-rate-monitor --help       Show this help
 
 Requires Claude CLI to be installed and authenticated.
-OAuth token is read from ~/.claude/.credentials.json
+Token is read from CLAUDE_CODE_AUTH_TOKEN env var (if set),
+or from ~/.claude/.credentials.json as fallback.
 `);
   process.exit(0);
 }
 
 // ─── Token ───────────────────────────────────────────────────────────
 function getToken() {
+  if (process.env.CLAUDE_CODE_AUTH_TOKEN) {
+    return process.env.CLAUDE_CODE_AUTH_TOKEN;
+  }
+
   if (!fs.existsSync(CREDENTIALS_PATH)) {
-    console.error('Error: Claude CLI credentials not found at ' + CREDENTIALS_PATH);
+    console.error('Error: Claude CLI credentials not found.');
+    console.error('');
+    console.error('Either set the CLAUDE_CODE_AUTH_TOKEN environment variable,');
+    console.error('or ensure credentials exist at ' + CREDENTIALS_PATH);
     console.error('');
     console.error('Make sure Claude CLI is installed and you have logged in:');
     console.error('  npm install -g @anthropic-ai/claude-code');
